@@ -1,0 +1,143 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model User {
+  id                String    @id @default(cuid())
+  name              String?
+  email             String?   @unique
+  emailVerified     DateTime?
+  image             String?
+  password          String?
+  userType          String?
+  isAdmin           Boolean   @default(false)
+  stripeCustomerId  String?   @unique
+  stripeAccountId   String?   @unique
+  accounts          Account[]
+  sessions          Session[]
+  jobs              Job[]
+  proposals         Proposal[]
+  sentMessages      Message[] @relation("SentMessages")
+  receivedMessages  Message[] @relation("ReceivedMessages")
+  reviewsGiven      Review[]  @relation("ReviewsGiven")
+  reviewsReceived   Review[]  @relation("ReviewsReceived")
+  paymentsMade      Payment[] @relation("PaymentsMade")
+  paymentsReceived  Payment[] @relation("PaymentsReceived")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model Job {
+  id           String     @id @default(cuid())
+  title        String
+  company      String
+  location     String
+  jobType      String
+  salary       String
+  description  String
+  requirements String
+  status       String     @default("active")
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  postedBy     User       @relation(fields: [postedById], references: [id])
+  postedById   String
+  proposals    Proposal[]
+  messages     Message[]
+  reviews      Review[]
+  payments     Payment[]
+}
+
+model Proposal {
+  id          String   @id @default(cuid())
+  coverLetter String
+  resume      String
+  status      String   @default("pending")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  job         Job      @relation(fields: [jobId], references: [id])
+  jobId       String
+  user        User     @relation(fields: [userId], references: [id])
+  userId      String
+}
+
+model Message {
+  id        String   @id @default(cuid())
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  sender    User     @relation("SentMessages", fields: [senderId], references: [id])
+  senderId  String
+  receiver  User     @relation("ReceivedMessages", fields: [receiverId], references: [id])
+  receiverId String
+  job       Job?     @relation(fields: [jobId], references: [id])
+  jobId     String?
+}
+
+model Review {
+  id          String   @id @default(cuid())
+  rating      Int
+  comment     String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  reviewer    User     @relation("ReviewsGiven", fields: [reviewerId], references: [id])
+  reviewerId  String
+  reviewee    User     @relation("ReviewsReceived", fields: [revieweeId], references: [id])
+  revieweeId  String
+  job         Job?     @relation(fields: [jobId], references: [id])
+  jobId       String?
+}
+
+model Payment {
+  id               String   @id @default(cuid())
+  amount           Int
+  currency         String
+  status           String
+  stripePaymentId  String   @unique
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  job              Job      @relation(fields: [jobId], references: [id])
+  jobId            String
+  payer            User     @relation("PaymentsMade", fields: [payerId], references: [id])
+  payerId          String
+  recipient        User     @relation("PaymentsReceived", fields: [recipientId], references: [id])
+  recipientId      String
+}
+
